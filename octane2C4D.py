@@ -1,15 +1,3 @@
-"""
-OctaneToC4d
-v0.1
-
-Written by Graeme McDougall for Painting Practice
-Copyright: Painting Practice (www.paintingpractice.com)
-Written for Cinema 4d R20.057
-
-Name-US:OctaneToC4d
-Description-US:Converts selected Octane materials to Cinema 4d materials, as best as possible
-"""
-
 import c4d
 from c4d import documents
 
@@ -19,11 +7,14 @@ ID_OCTANE_COLORCORRECTION = 1029512
 ID_OCTANE_INVERT_TEXTURE = 1029514
 ID_OCTANE_MULTIPLY_TEXTURE = 1029516
 ID_OCTANE_MIXTEXTURE = 1029505
+ID_OCTANE_ADD = 1038877
+ID_OCTANE_BBEMISSION = 1029641
+ID_OCTANE_TEXTURE_EMISSION = 1029642
 mainLayerId = 526336
 
 
 def CheckSelection(doc, mats):                                                    #Checks selection & returns a list of only the Octane materials
-    oct_mats = []                                                                 #Create an empty list, to later store any Octane materials
+    oct_mats = []                                                                #Create an empty list, to later store any Octane materials
     if mats:                                                                      #If there are any materials selected...
         count  = len(mats)                                                        #...get how many
         for i in range(count):                                                    #for each one...
@@ -36,11 +27,27 @@ def GetTexture(doc, oct_mat, channel):                                          
     image_shader = oct_mat[channel]                                               #Check the texture link & load shader in variable image_tex
     if image_shader:                                                              #If one is found...
         shader_type = image_shader.GetType()                                      #...get it's type
+        
+        if shader_type == ID_OCTANE_BBEMISSION:                             
+            image_shader = image_shader[c4d.BBEMISSION_EFFIC_OR_TEX]       
+            if image_shader:                                                      
+                shader_type = image_shader.GetType()
+                print(shader_type)
+                
+        if shader_type == ID_OCTANE_TEXTURE_EMISSION:                             
+            image_shader = image_shader[c4d.TEXEMISSION_EFFIC_OR_TEX]
+            if image_shader:                                                      
+                shader_type = image_shader.GetType()
 
         if shader_type == ID_OCTANE_MULTIPLY_TEXTURE:                             #If it's a multiply shader...
             image_shader = image_shader[c4d.MULTIPLY_TEXTURE1]                    #Get the first shader in it
             if image_shader:                                                      #If we found a shader of some sort
                 shader_type = image_shader.GetType()                              #Load it's type into the tex_type variable
+                
+        if shader_type == ID_OCTANE_ADD:                             
+            image_shader = image_shader[c4d.ADD_TEX_TEXTURE1]            
+            if image_shader:                                                      
+                shader_type = image_shader.GetType()
 
         if shader_type == ID_OCTANE_MIXTEXTURE:                                   #If it's a mix shader...
             image_shader = image_shader[c4d.MIXTEX_TEXTURE1_LNK]                  #Get the first shader in it
@@ -59,7 +66,6 @@ def GetTexture(doc, oct_mat, channel):                                          
 
         if shader_type == ID_OCTANE_IMAGE_TEXTURE:                                #If after checking all this, we have an image texture shader..
             image_name = image_shader[c4d.IMAGETEXTURE_FILE]                      #Read the filename into the image_link variable
-            print image_name
     return image_name                                                             #Return the filename, if found
 
 def ReAssign(doc, oct_mat, c4d_mat):                                              #Assigns the new Cinema 4D material to the texture tags
@@ -119,6 +125,14 @@ def RebuildMats(doc, oct_mats):                                                 
             c4d_mat[mainLayerId + c4d.REFLECTION_LAYER_MAIN_DISTRIBUTION] = 2     #Change the Default Specular to a Beckmann type
             c4d_mat[mainLayerId + c4d.REFLECTION_LAYER_MAIN_SHADER_ROUGHNESS] = rough_shader
             c4d_mat.InsertShader(rough_shader)                                    #...and insert it into the material
+            
+        emission_file = GetTexture(doc, oct_mat, c4d.OCT_MATERIAL_EMISSION)    
+        if emission_file:                                                            
+            emission_shader = c4d.BaseShader(c4d.Xbitmap)                            
+            emission_shader[c4d.BITMAPSHADER_FILENAME] = emission_file                   
+            c4d_mat[c4d.MATERIAL_LUMINANCE_SHADER] = emission_shader            
+            c4d_mat.InsertShader(emission_shader)                                     
+            c4d_mat[c4d.MATERIAL_USE_LUMINANCE] = True  
 
         ReAssign(doc, oct_mat, c4d_mat)                                           #Assign the new Cinema material inplace of the Octane one
 
